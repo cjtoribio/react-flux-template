@@ -2,9 +2,11 @@ var path = require("path");
 var webpack = require("webpack");
 var ExtractTextPlugin = require("extract-text-webpack-plugin");
 var StatsPlugin = require("stats-webpack-plugin");
-var loadersByExtension = require("./config/loadersByExtension");
+var loadersByExtension = require("./loadersByExtension");
 
 module.exports = function(options) {
+	var projectDirectory = path.join(__dirname,'../../');
+
 	var entry = {
 		main: options.prerender ? "./config/mainPrerenderer" : "./config/mainApp"
 		// second: options.prerender ? "./config/secondPrerenderer" : "./config/secondApp"
@@ -13,7 +15,7 @@ module.exports = function(options) {
 		"jsx": options.hotComponents ? ["react-hot-loader", "babel-loader?stage=0"] : "babel-loader?stage=0",
 		"js": {
 			loader: "babel-loader?stage=0",
-			include: path.join(__dirname, "app")
+			include: path.join(projectDirectory, "app")
 		},
 		"json": "json-loader",
 		"coffee": "coffee-redux-loader",
@@ -26,16 +28,7 @@ module.exports = function(options) {
 		"html": "html-loader",
 		"md|markdown": ["html-loader", "markdown-loader"]
 	};
-	var cssLoader = options.minimize ? "css-loader?module" : "css-loader?module&localIdentName=[path][name]---[local]---[hash:base64:5]";
-	var stylesheetLoaders = {
-		"css": cssLoader,
-		"less": [cssLoader, "less-loader"],
-		"styl": [cssLoader, "stylus-loader"],
-		"scss|sass": [cssLoader, "sass-loader"]
-	};
-	var additionalLoaders = [
-		// { test: /some-reg-exp$/, loader: "any-loader" }
-	];
+
 	var alias = {
 
 	};
@@ -45,14 +38,11 @@ module.exports = function(options) {
 	var externals = [
 
 	];
-	var modulesDirectories = ["web_modules", "node_modules"];
-	var extensions = ["", ".web.js", ".js", ".jsx"];
-	var root = path.join(__dirname, "app");
 	var publicPath = options.devServer ?
 		"http://localhost:2992/_assets/" :
 		"/_assets/";
 	var output = {
-		path: path.join(__dirname, "build", options.prerender ? "prerender" : "public"),
+		path: path.join(projectDirectory, "build", options.prerender ? "prerender" : "public"),
 		publicPath: publicPath,
 		filename: "[name].js" + (options.longTermCaching && !options.prerender ? "?[chunkhash]" : ""),
 		chunkFilename: (options.devServer ? "[id].js" : "[name].js") + (options.longTermCaching && !options.prerender ? "?[chunkhash]" : ""),
@@ -69,21 +59,21 @@ module.exports = function(options) {
 		new webpack.PrefetchPlugin("react/lib/ReactComponentBrowserEnvironment")
 	];
 	if(options.prerender) {
-		plugins.push(new StatsPlugin(path.join(__dirname, "build", "stats.prerender.json"), {
+		plugins.push(new StatsPlugin(path.join(projectDirectory, "build", "stats.prerender.json"), {
 			chunkModules: true,
 			exclude: excludeFromStats
 		}));
-		aliasLoader["react-proxy$"] = "react-proxy/unavailable";
-		aliasLoader["react-proxy-loader$"] = "react-proxy-loader/unavailable";
-		externals.push(
-			/^react(\/.*)?$/,
-			/^reflux(\/.*)?$/,
-			"superagent",
-			"async"
-		);
+		// aliasLoader["react-proxy$"] = "react-proxy/unavailable";
+		// aliasLoader["react-proxy-loader$"] = "react-proxy-loader/unavailable";
+		// externals.push(
+		// 	/^react(\/.*)?$/,
+		// 	/^reflux(\/.*)?$/,
+		// 	"superagent",
+		// 	"async"
+		// );
 		plugins.push(new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
-	} else {
-		plugins.push(new StatsPlugin(path.join(__dirname, "build", "stats.json"), {
+	}else{
+		plugins.push(new StatsPlugin(path.join(projectDirectory, "build", "stats.json"), {
 			chunkModules: true,
 			exclude: excludeFromStats
 		}));
@@ -92,14 +82,24 @@ module.exports = function(options) {
 		plugins.push(new webpack.optimize.CommonsChunkPlugin("commons", "commons.js" + (options.longTermCaching && !options.prerender ? "?[chunkhash]" : "")));
 	}
 	var asyncLoader = {
-		test: require("./app/route-handlers/async").map(function(name) {
-			return path.join(__dirname, "app", "route-handlers", name);
+		test: require(path.join(projectDirectory, "./app/route-handlers/async")).map(function(name) {
+			return path.join(projectDirectory, "app", "route-handlers", name);
 		}),
 		loader: options.prerender ? "react-proxy-loader/unavailable" : "react-proxy-loader"
 	};
 
 
 
+
+	var cssLoader = options.minimize ? 
+					"css-loader?module" : 
+					"css-loader?module&localIdentName=[path][name]---[local]---[hash:base64:5]";
+	var stylesheetLoaders = {
+		"css"		:  cssLoader,
+		"less"		: [cssLoader, "less-loader"],
+		"styl"		: [cssLoader, "stylus-loader"],
+		"scss|sass"	: [cssLoader, "sass-loader"]
+	};
 	Object.keys(stylesheetLoaders).forEach(function(ext) {
 		var stylesheetLoader = stylesheetLoaders[ext];
 		if(Array.isArray(stylesheetLoader)) stylesheetLoader = stylesheetLoader.join("!");
@@ -124,6 +124,8 @@ module.exports = function(options) {
 			new webpack.optimize.DedupePlugin()
 		);
 	}
+
+
 	if(options.minimize) {
 		plugins.push(
 			new webpack.DefinePlugin({
@@ -135,30 +137,61 @@ module.exports = function(options) {
 		);
 	}
 
+
 	return {
+		// entry file for processing
 		entry: entry,
 		output: output,
+
+		// node outputs for node to handle while web is compiled for the web
 		target: options.prerender ? "node" : "web",
+
+		// register all loaders
 		module: {
-			loaders: [asyncLoader].concat(loadersByExtension(loaders)).concat(loadersByExtension(stylesheetLoaders)).concat(additionalLoaders)
+			loaders: [asyncLoader]
+					 .concat(loadersByExtension(loaders))
+					 .concat(loadersByExtension(stylesheetLoaders))
+					 .concat([]) // any aditional loader
 		},
+
+		// See "https://webpack.github.io/docs/configuration.html#devtool" (source-maps, eval)
 		devtool: options.devtool,
+
+		// Switch loaders to debug mode.
 		debug: options.debug,
 		resolveLoader: {
-			root: path.join(__dirname, "node_modules"),
+			
+			// root to resolve loaders
+			root: path.join(projectDirectory, "node_modules"),
+
+			// alias for loaders
 			alias: aliasLoader
+
 		},
-		externals: externals,
+		// allows require('moduleName') when moduleName was a script not resolved by webpack
+		// example if you import jQuery from CDN this will mock a module with jQuery and allow require.
+		externals: [],
 		resolve: {
-			root: root,
-			modulesDirectories: modulesDirectories,
-			extensions: extensions,
-			alias: alias
+
+			// root of the project
+			root: path.join(projectDirectory, "app"), 
+
+			// foler names of modules
+			modulesDirectories: ["web_modules", "node_modules"], 
+
+			// extensions for modules
+			extensions: ["", ".web.js", ".js", ".jsx"], 
+			
+			// map of aliases for modules
+			alias: {} 
 		},
+		// adds all the plugins
 		plugins: plugins,
+
+		
 		devServer: {
 			stats: {
-				cached: false,
+				cached: true,
 				exclude: excludeFromStats
 			}
 		}

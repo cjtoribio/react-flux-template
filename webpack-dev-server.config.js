@@ -1,5 +1,6 @@
-module.exports = require("./make-webpack-config")({
+module.exports = require("./utils/webpack/make-webpack-config")({
 	devServer: true,
-	devtool: "eval",
+	hotComponents: true,
+	devtool: "source-maps",
 	debug: true
 });
